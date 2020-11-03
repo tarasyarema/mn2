@@ -5,11 +5,20 @@
 #include <stdlib.h>
 #include <time.h>
 
-/* Debug purposes xd */
-#define DEBUG 0
+/* Utility functions not defined for doubles */
+#define dmax(x, y) ((x > y) ? (x) : (y))
+#define dabs(x) ((x > 0) ? (x) : (-x))
 
-/* The matrix dimensions */
+/* Handles if the execution mode is
+ * for submitting */
+#define SUBMIT 0
+
+#if SUBMIT
 #define N 1000000
+#else
+/* This is used for debugging and testing purposes */
+#define N 1000
+#endif
 
 /* The tolerance, or acceptable error */
 #define ERROR (double)1e-12
@@ -22,12 +31,13 @@ const char *jacobi_file = "Jacobi_YaremaTaras.txt";
 const char *gauss_seidel_file = "Gauss-Seidel_YaremaTaras.txt";
 const char *sor_file = "SOR_YaremaTaras.txt";
 
-/* Returns the absolute value of a double x */
-double dabs(double x) { return x > 0 ? x : -x; }
-
 /* Prints the resume of a function execution */
 void print_resume(const char *n, int its, double err, double t) {
+#if SUBMIT
+    printf("Algoritme: %s Iterats: %d Error: %.8e", n, its, err);
+#else
     printf("%13s | its = %4d | err = %.8e | time = %2.6f s\n", n, its, err, t);
+#endif
 }
 
 /* Prints the solution vector in the correct format */
@@ -42,10 +52,10 @@ int print_solution(const char *name, double *sol) {
     }
 
     /* Print in the correct format */
-#if DEBUG == 1
-    for (i = 0; i < N; ++i) {
-#else
+#if SUBMIT
     for (i = 0; i < N; i += 1000) {
+#else
+    for (i = 0; i < N; ++i) {
 #endif
         fprintf(f, "%s%2.14f", i == 0 ? "" : ",", sol[i]);
     }
@@ -72,7 +82,7 @@ double get_matrix_value(int i, int j) {
 double get_independent_value(int i) {
     /* We assue that you give value in the correct range,
      * i.e. 0 <= i < N. */
-    return (double)i / (double)N;
+    return (double)(i + 1) / (double)N;
 }
 
 /* Compute the element i-th element of D^-1 * b, c[i] */
@@ -132,13 +142,15 @@ double vector_norm(double *v) {
 
 /* Computes the ||δ(k)|| = ||actual - last|| = ||x(k+1) - x(k)|| */
 double delta_norm(double *actual, double *last) {
-    double norm = 0, tmp;
+    double norm = 0, tmp = 0;
     int i = 0;
     for (i = 0; i < N; ++i) {
+        /* tmp = dmax(tmp, dabs(actual[i] - last[i])); */
         tmp = actual[i] - last[i];
         norm += (tmp * tmp);
     }
     return sqrt(norm);
+    /* return tmp; */
 }
 
 /* Computes the Jacobi method for the given stationary system.
@@ -262,10 +274,10 @@ int gauss_seidel() {
         /* Swap the solutions */
         for (i = 0; i < N; ++i) sol[1][i] = sol[0][i];
 
-        /* Check for stop criterion, note the 4 dividing.
+        /* Check for stop criterion, note the 2 dividing.
          * Its computed via the absolute error stop criterion with the
-         * norm of the matrix B = 0.80 */
-        if (iterations > 2 && delta <= ERROR / 4.) {
+         * norm of the matrix B <= 2/3 */
+        if (iterations > 2 && delta <= ERROR / 2.) {
             break;
         }
 
