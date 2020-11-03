@@ -1,0 +1,22 @@
+name: P1 Test solver accuracy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2.1.4
+
+      - name: Run test/s
+        run: |
+            cd 1/
+            make test
