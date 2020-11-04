@@ -12,5 +12,6 @@ compile:
 	gcc -ansi -Wall -pedantic YaremaTaras.c -o main -lm
 
 docs:
-	pandoc YaremaTaras.md -s --pdf-engine=xelatex -o YaremaTaras.pdf
+	latexmk -quiet -pdf p1.tex
+	latexmk -quiet -c p1.tex
 

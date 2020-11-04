@@ -20,7 +20,7 @@
 #define ERROR (double)1e-12
 
 /* Max iterations to mark proccess as not convergent */
-#define ITER_MAX 1000
+#define ITER_MAX 200
 
 /* Output files as constants */
 const char *jacobi_file = "Jacobi_YaremaTaras.txt";
@@ -289,7 +289,7 @@ int gauss_seidel() {
         /* Check for stop criterion, note the 2 dividing.
          * Its computed via the absolute error stop criterion with the
          * norm of the matrix B <= 2/3 */
-        if (iterations > 2 && delta <= ERROR / 4.) {
+        if (iterations > 2 && delta <= ERROR / 2.) {
             break;
         }
 
@@ -367,7 +367,7 @@ int sor(double w, int least_iters, int want_print) {
         /* Check for stop criterion, note the 2 dividing.
          * Its computed via the absolute error stop criterion with the
          * norm of the matrix B <= 2/3 */
-        if (iterations > 2 && delta <= ERROR / 4.) {
+        if (iterations > 2 && delta <= ERROR / 2.) {
             break;
         }
 
@@ -395,9 +395,9 @@ int sor(double w, int least_iters, int want_print) {
 }
 
 int main() {
-    /* Best computed SOR with step = 0.0001 is w = 1.220600,
-     * elapsing around 100 seconds */
-    double w, w_best, step = 0.005, elapsed;
+    /* Best computed SOR with step = _ is w = _,
+     * elapsing around _ seconds */
+    double w, w_best, step = 0.01, elapsed;
     int sor_actual, sor_best = ITER_MAX, iters = 0;
     clock_t t;
 
@@ -406,7 +406,7 @@ int main() {
 
     t = clock();
 
-    for (w = 0.1; w < 2; w += step) {
+    for (w = 0.70; w < 1.60; w += step) {
         sor_actual = sor(w, sor_best, 0);
 
         if (sor_actual < sor_best) {
@@ -420,7 +420,10 @@ int main() {
     elapsed = (double)(clock() - t) / (double)CLOCKS_PER_SEC;
 
     sor(w_best, ITER_MAX, 1);
+
+#if !SUBMIT
     printf("%15s | %d steps computed in %2.4f s\n", "sor", iters, elapsed);
+#endif
 
     return 0;
 }
