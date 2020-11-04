@@ -58,7 +58,8 @@ def main():
 
     file_names = [
         "./Jacobi_YaremaTaras.txt",
-        "./Gauss-Seidel_YaremaTaras.txt"
+        "./Gauss-Seidel_YaremaTaras.txt",
+        "./SOR_YaremaTaras.txt"
     ]
 
     for file_name in file_names:
@@ -67,16 +68,18 @@ def main():
                 [np.float(e) for e in f.readlines()[0].split(',')]
             )
 
-            diff = np.linalg.norm(target - x)
+            # Compute the infinity norm difference
+            # between the excepted solution and the computed one
+            diff = np.linalg.norm(target - x, np.inf)
 
             # Check for the error we got with C
             try:
                 assert diff < ERROR
             except AssertionError:
-                print(f"Large error ({file_name}) = {diff}")
+                print(f"Large error ({file_name}) -> {diff} < {ERROR}")
                 exit(1)
 
-    print("OK")
+    print(f"OK {len(file_names)}/{len(file_names)}")
     exit(0)
 
 

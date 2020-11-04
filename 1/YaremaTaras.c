@@ -5,10 +5,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-/* Utility functions not defined for doubles */
-#define dmax(x, y) ((x > y) ? (x) : (y))
-#define dabs(x) ((x > 0) ? (x) : (-x))
-
 /* Handles if the execution mode is
  * for submitting */
 #define SUBMIT 0
@@ -34,9 +30,9 @@ const char *sor_file = "SOR_YaremaTaras.txt";
 /* Prints the resume of a function execution */
 void print_resume(const char *n, int its, double err, double t) {
 #if SUBMIT
-    printf("Algoritme: %s Iterats: %d Error: %.8e", n, its, err);
+    printf("Algoritme: %s Iterats: %d Error: %.8e\n", n, its, err);
 #else
-    printf("%13s | its = %4d | err = %.8e | time = %2.6f s\n", n, its, err, t);
+    printf("%15s | its = %4d | err = %.8e | time = %2.6f s\n", n, its, err, t);
 #endif
 }
 
@@ -123,7 +119,7 @@ double matrix_norm_inf(double (*getter)(int, int)) {
         if (i >= 3 && i + 3 < N) partial += (*getter)(0, 3);
 
         /* Get absolute value */
-        partial = dabs(partial);
+        partial = fabs(partial);
 
         /* Update best */
         best = partial > best ? partial : best;
@@ -140,27 +136,42 @@ double vector_norm(double *v) {
     return sqrt(norm);
 }
 
-/* Computes the ||δ(k)|| = ||actual - last|| = ||x(k+1) - x(k)|| */
+/* Computes the ||δ(k)||_2 = ||actual - last|| = ||x(k+1) - x(k)|| */
 double delta_norm(double *actual, double *last) {
     double norm = 0, tmp = 0;
     int i = 0;
     for (i = 0; i < N; ++i) {
-        /* tmp = dmax(tmp, dabs(actual[i] - last[i])); */
         tmp = actual[i] - last[i];
         norm += (tmp * tmp);
     }
     return sqrt(norm);
-    /* return tmp; */
+}
+
+/* Computes the ||δ(k)||_inf = ||actual - last|| = ||x(k+1) - x(k)|| */
+double delta_norm_inf(double *actual, double *last) {
+    double norm = 0, tmp;
+    int i = 0;
+
+    for (i = 0; i < N; ++i) {
+        tmp = fabs(actual[i] - last[i]);
+        if (tmp > norm) norm = tmp;
+    }
+
+    return norm;
+}
+
+/* Utility function two swap to pointers of type *double */
+void swap(double **a, double **b) {
+    double *temp = *a;
+    *a = *b;
+    *b = temp;
 }
 
 /* Computes the Jacobi method for the given stationary system.
  * Total allocs: 2 * N * 8 bytes, i.e. for N = 10^6 we need 0.16 megabytes. */
 int jacobi() {
-    double partial, delta, elapsed;
+    double delta, elapsed;
     int i, iterations = 0;
-
-    /* Return related */
-    int return_code = 0, ret;
 
     /* Benchmarking purposes */
     clock_t t;
@@ -177,27 +188,30 @@ int jacobi() {
          * So to compute every element of the solution vector we do so in O(N)
          * time, no O(n^2) as we would with a matrix. */
         for (i = 0; i < N; ++i) {
-            partial = 0.0;
+            sol[1][i] = get_c_value(i);
 
             /* First row needs to sum the right-top corner */
             if (i == 0)
-                partial += get_bj_matrix_value(i, N - 1) * sol[1][N - 1];
+                sol[1][i] -= get_bj_matrix_value(i, N - 1) * sol[0][N - 1];
 
             /* Last row needs to sum the left-bot corner */
-            if (i == N - 1) partial += get_bj_matrix_value(0, i) * sol[1][0];
+            if (i == N - 1) sol[1][i] -= get_bj_matrix_value(0, i) * sol[0][0];
 
-            /* Add the upper/lower diagonal elements when needed */
-            if (i >= 3) partial += get_bj_matrix_value(0, 3) * sol[1][i - 3];
-            if (i + 3 < N) partial += get_bj_matrix_value(0, 3) * sol[1][i + 3];
+            /* Lower diagonal element */
+            if (i >= 3)
+                sol[1][i] -= get_bj_matrix_value(i, i - 3) * sol[0][i - 3];
 
-            sol[0][i] = get_c_value(i) - partial;
+            /* Upper diagonal element */
+            if (N - i > 3)
+                sol[1][i] -= get_bj_matrix_value(0, 3) * sol[0][i + 3];
         }
 
         /* Compute the actual absolute error */
-        delta = delta_norm(sol[0], sol[1]);
+        delta = delta_norm_inf(sol[1], sol[0]);
 
         /* Swap the solutions */
-        for (i = 0; i < N; ++i) sol[1][i] = sol[0][i];
+        swap(&sol[0], &sol[1]);
+        /* for (i = 0; i < N; ++i) sol[1][i] = sol[0][i]; */
 
         /* Check for stop criterion, note the 4 dividing.
          * Its computed via the absolute error stop criterion with the
@@ -209,38 +223,37 @@ int jacobi() {
         ++iterations;
     }
 
-    if (iterations >= ITER_MAX) return_code = 2;
-
     /* Stdout debugging */
     elapsed = (double)(clock() - t) / (double)CLOCKS_PER_SEC;
     print_resume("jacobi", iterations, delta, elapsed);
 
     /* Print solution to correct file */
-    if ((ret = print_solution(jacobi_file, sol[1]))) return_code = ret;
+    print_solution(jacobi_file, sol[0]);
 
     /* Free everything */
     free(sol[0]);
     free(sol[1]);
     free(sol);
 
-    return return_code;
+    return iterations;
 }
 
 /* Computes the Gauss-Seidel method for the given stationary system.
  * Total allocs: 2 * N * 8 bytes, i.e. for N = 10^6 we need 0.16 megabytes. */
 int gauss_seidel() {
-    double partial, delta, elapsed;
+    double delta, elapsed;
     int i, iterations = 0;
-
-    /* Return related */
-    int return_code = 0, ret;
 
     /* Benchmarking purposes */
     clock_t t;
 
     /* Init the solution vectors */
     double **sol = malloc(2 * sizeof(double *));
+
+    /* The k-th x */
     sol[0] = (double *)calloc(N, sizeof(double));
+
+    /* The (k+1)-th x */
     sol[1] = (double *)calloc(N, sizeof(double));
 
     t = clock();
@@ -248,61 +261,166 @@ int gauss_seidel() {
     while (iterations < ITER_MAX) {
         /* As in Jacobi, this method is also O(n) */
         for (i = 0; i < N; ++i) {
-            partial = 0.0;
+            sol[1][i] = get_c_value(i);
 
             /* First row needs to sum the right-top corner */
             if (i == 0)
-                partial += get_bj_matrix_value(i, N - 1) * sol[1][N - 1];
+                sol[1][i] -= get_bj_matrix_value(i, N - 1) * sol[0][N - 1];
 
-            /* Last row needs to sum the left-bot corner and
-             * multiply it by the (k+1)-th solution. */
-            if (i == N - 1) partial += get_bj_matrix_value(0, i) * sol[0][0];
+            /* Last row needs to sum the left-bot corner */
+            if (i == N - 1) sol[1][i] -= get_bj_matrix_value(0, i) * sol[1][0];
 
-            /* Add the upper/lower diagonal elements when needed.
-             * Note that, as before, the element in the lower diagonal are
-             * multiplied by the (k+1)-th solution. */
-            if (i >= 3) partial += get_bj_matrix_value(0, 3) * sol[0][i - 3];
+            /* Lower diagonal element */
+            if (i >= 3)
+                sol[1][i] -= get_bj_matrix_value(i, i - 3) * sol[1][i - 3];
 
-            if (i + 3 < N) partial += get_bj_matrix_value(0, 3) * sol[1][i + 3];
-
-            sol[0][i] = get_c_value(i) - partial;
+            /* Upper diagonal element */
+            if (N - i > 3)
+                sol[1][i] -= get_bj_matrix_value(i, i + 3) * sol[0][i + 3];
         }
 
         /* Compute the actual absolute error */
-        delta = delta_norm(sol[0], sol[1]);
+        delta = delta_norm_inf(sol[1], sol[0]);
 
         /* Swap the solutions */
-        for (i = 0; i < N; ++i) sol[1][i] = sol[0][i];
+        swap(&sol[0], &sol[1]);
+        /* for (i = 0; i < N; ++i) sol[1][i] = sol[0][i]; */
 
         /* Check for stop criterion, note the 2 dividing.
          * Its computed via the absolute error stop criterion with the
          * norm of the matrix B <= 2/3 */
-        if (iterations > 2 && delta <= ERROR / 2.) {
+        if (iterations > 2 && delta <= ERROR / 4.) {
             break;
         }
 
         ++iterations;
     }
 
-    if (iterations >= ITER_MAX) return_code = 2;
-
     /* Stdout debugging */
     elapsed = (double)(clock() - t) / (double)CLOCKS_PER_SEC;
     print_resume("gauss-seidel", iterations, delta, elapsed);
 
     /* Print solution to correct file */
-    if ((ret = print_solution(gauss_seidel_file, sol[1]))) return_code = ret;
+    print_solution(gauss_seidel_file, sol[0]);
 
     /* Free everything */
     free(sol[0]);
     free(sol[1]);
     free(sol);
 
-    return return_code;
+    return iterations;
+}
+
+int sor(double w, int least_iters, int want_print) {
+    double delta, elapsed;
+    int i, iterations = 0;
+    char name_buffer[16];
+
+    /* Benchmarking purposes */
+    clock_t t;
+
+    /* Init the solution vectors */
+    double **sol = malloc(2 * sizeof(double *));
+
+    /* The k-th x */
+    sol[0] = (double *)calloc(N, sizeof(double));
+
+    /* The (k+1)-th x */
+    sol[1] = (double *)calloc(N, sizeof(double));
+
+    t = clock();
+
+    while (iterations < ITER_MAX) {
+        /* As in Jacobi, this method is also O(n) */
+        for (i = 0; i < N; ++i) {
+            sol[1][i] = get_c_value(i);
+
+            /* First row needs to sum the right-top corner */
+            if (i == 0)
+                sol[1][i] -= get_bj_matrix_value(i, N - 1) * sol[0][N - 1];
+
+            /* Last row needs to sum the left-bot corner */
+            if (i == N - 1) sol[1][i] -= get_bj_matrix_value(0, i) * sol[1][0];
+
+            /* Lower diagonal element */
+            if (i >= 3)
+                sol[1][i] -= get_bj_matrix_value(i, i - 3) * sol[1][i - 3];
+
+            /* Upper diagonal element */
+            if (N - i > 3)
+                sol[1][i] -= get_bj_matrix_value(i, i + 3) * sol[0][i + 3];
+
+            /* Compute right side */
+            sol[1][i] = w * (sol[1][i] - sol[0][i]);
+
+            /* Add left side */
+            sol[1][i] += sol[0][i];
+        }
+
+        /* Compute the actual absolute error */
+        delta = delta_norm_inf(sol[1], sol[0]);
+
+        /* Swap the solutions */
+        swap(&sol[0], &sol[1]);
+        /* for (i = 0; i < N; ++i) sol[1][i] = sol[0][i]; */
+
+        /* Check for stop criterion, note the 2 dividing.
+         * Its computed via the absolute error stop criterion with the
+         * norm of the matrix B <= 2/3 */
+        if (iterations > 2 && delta <= ERROR / 4.) {
+            break;
+        }
+
+        ++iterations;
+    }
+
+    /* Stdout debugging */
+    elapsed = (double)(clock() - t) / (double)CLOCKS_PER_SEC;
+
+    if (want_print) {
+        /* Sprintf the sor name */
+        sprintf(name_buffer, "sor(%1.6f)", w);
+        print_resume(name_buffer, iterations, delta, elapsed);
+
+        /* Only print solution when asked for */
+        print_solution(sor_file, sol[0]);
+    }
+
+    /* Free everything */
+    free(sol[0]);
+    free(sol[1]);
+    free(sol);
+
+    return iterations;
 }
 
 int main() {
+    /* Best computed SOR with step = 0.0001 is w = 1.220600,
+     * elapsing around 100 seconds */
+    double w, w_best, step = 0.005, elapsed;
+    int sor_actual, sor_best = ITER_MAX, iters = 0;
+    clock_t t;
+
     jacobi();
     gauss_seidel();
+
+    t = clock();
+
+    for (w = 0.1; w < 2; w += step) {
+        sor_actual = sor(w, sor_best, 0);
+
+        if (sor_actual < sor_best) {
+            sor_best = sor_actual;
+            w_best = w;
+        }
+
+        ++iters;
+    }
+
+    elapsed = (double)(clock() - t) / (double)CLOCKS_PER_SEC;
+
+    sor(w_best, ITER_MAX, 1);
+    printf("%15s | %d steps computed in %2.4f s\n", "sor", iters, elapsed);
+
     return 0;
 }
