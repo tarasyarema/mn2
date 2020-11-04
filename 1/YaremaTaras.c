@@ -421,7 +421,9 @@ int main() {
 
     sor(w_best, ITER_MAX, 1);
 
-#if !SUBMIT
+#if SUBMIT
+    printf("Computed %d of SOR in %2.4f s\n", iters, elapsed);
+#else
     printf("%15s | %d steps computed in %2.4f s\n", "sor", iters, elapsed);
 #endif
 

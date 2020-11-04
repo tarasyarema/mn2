@@ -39,6 +39,11 @@ def main():
     A = np.fromiter((
         get_matrix_value(i, j) for j in range(N)
         for i in range(N)), float).reshape((N, N))
+
+    B = A.copy()
+    np.fill_diagonal(B, 0)
+    B /= 5
+
     b = np.fromiter(((i + 1) / N for i in range(N)), float)
 
     t = time() - t
