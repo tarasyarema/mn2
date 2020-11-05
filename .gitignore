@@ -1,3 +1,6 @@
 *.o
 main
 main.exe
+test
+test.c
+test.exe
