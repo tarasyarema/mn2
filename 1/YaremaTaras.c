@@ -6,8 +6,13 @@
 #include <time.h>
 
 /* Handles if the execution mode is
- * for submitting */
-#define SUBMIT 0
+ * for submitting, i.e. assignement */
+#define SUBMIT 1
+
+/* Value to control if we want to compute all
+ * the SOR steps or just computed the re-computed
+ * best omega = 1.22 */
+#define BEST_SOR 1
 
 #if SUBMIT
 #define N 1000000
@@ -29,11 +34,7 @@ const char *sor_file = "SOR_YaremaTaras.txt";
 
 /* Prints the resume of a function execution */
 void print_resume(const char *n, int its, double err, double t) {
-#if SUBMIT
-    printf("Algoritme: %s Iterats: %d Error: %.8e\n", n, its, err);
-#else
     printf("%15s | its = %4d | err = %.8e | time = %2.6f s\n", n, its, err, t);
-#endif
 }
 
 /* Prints the solution vector in the correct format */
@@ -395,8 +396,13 @@ int sor(double w, int least_iters, int want_print) {
 }
 
 int main() {
-    /* Best computed SOR with step = _ is w = _,
-     * elapsing around _ seconds */
+    /* We use macros here wo the compiler do not complain
+     * for unused variables */
+#if BEST_SOR
+    jacobi();
+    gauss_seidel();
+    sor(1.22, ITER_MAX, 1);
+#else
     double w, w_best, step = 0.01, elapsed;
     int sor_actual, sor_best = ITER_MAX, iters = 0;
     clock_t t;
@@ -421,10 +427,7 @@ int main() {
 
     sor(w_best, ITER_MAX, 1);
 
-#if SUBMIT
-    printf("Computed %d of SOR in %2.4f s\n", iters, elapsed);
-#else
-    printf("%15s | %d steps computed in %2.4f s\n", "sor", iters, elapsed);
+    printf("%d SOR steps computed in %2.4f s\n", iters, elapsed);
 #endif
 
     return 0;
