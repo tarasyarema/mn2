@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define FILE_NAME "YaremaTaras.txt"
+
 #define TOLERANCE 1e-12
 #define H_STEP 1e-3
 #define MAX_ITERATIONS 1000
@@ -126,10 +128,9 @@ int tangent(double *p, double *vec) {
 
 /*
  * Uses the Newton method to find a zero of f at distance h from a
- * first zero (x0, y0)
+ * first zero (x0, y0) and a nearby (at distance h) point (x1, y1)
  */
-int newton_iterator(double x0, double y0, double x1, double y1, double h,
-                    double *result) {
+int newton_iterator(double x0, double y0, double x1, double y1, double *res) {
     double *H, *partial_f;
     double detH, x2, y2, incr_x, incr_y;
     int n = 0, exit_code = 0;
@@ -149,13 +150,14 @@ int newton_iterator(double x0, double y0, double x1, double y1, double h,
          *  2. The value (x_k - x_0)^2 + (y_k - y_0)^2 = h^2 is sufficiently low
          */
         if (fabs(f(x1, y1)) < TOLERANCE &&
-            fabs(pow(x1 - x0, 2) + pow(y1 - y0, 2) - pow(h, 2)) < TOLERANCE) {
+            fabs(pow(x1 - x0, 2) + pow(y1 - y0, 2) - pow(H_STEP, 2)) <
+                TOLERANCE) {
             break;
         }
 
         /* Compute H(x_k) = (f(x_k), g(x_k)) */
         H[0] = f(x1, y1);
-        H[1] = pow(x1 - x0, 2) + pow(y1 - y0, 2) - pow(h, 2);
+        H[1] = pow(x1 - x0, 2) + pow(y1 - y0, 2) - pow(H_STEP, 2);
 
         /* Compute the determinant of DH */
         gradient(x1, y1, partial_f);
@@ -187,66 +189,77 @@ out:
     free(H);
     free(partial_f);
 
-    result[0] = x1;
-    result[1] = y1;
+    res[0] = x1;
+    res[1] = y1;
 
     return 0;
 }
 
 int main() {
     FILE *output;
-
-    double h = H_STEP;
     int i, exit_code;
 
-    /* Temp storage for the current point */
-    double *point, *tgt;
-
-    /* Store last iteration derivative to check we're going */
-    /* in the right direction */
-    double *tgt0;
+    double *p, *t, *tmp;
 
     /* Time benchmarking */
     clock_t start_time, end_time;
     double elapsed_time;
 
-    point = calloc(2, sizeof(double));
-    if (point == NULL) return 2;
+    /* Handle the memory allocation gracefully */
+    p = calloc(2, sizeof(double));
+    if (p == NULL) {
+        exit_code = 2;
+        goto out;
+    }
 
-    tgt = calloc(2, sizeof(double));
-    if (tgt == NULL) return 2;
+    t = calloc(2, sizeof(double));
+    if (t == NULL) {
+        exit_code = 2;
+        goto p_free;
+    }
 
-    tgt0 = calloc(2, sizeof(double));
-    if (tgt0 == NULL) return 2;
+    tmp = calloc(2, sizeof(double));
+    if (tmp == NULL) {
+        exit_code = 2;
+        goto t_free;
+    }
 
-    output = fopen("results.txt", "w");
-    if (output == NULL) return 3;
+    output = fopen(FILE_NAME, "w");
+    if (output == NULL) {
+        exit_code = 3;
+        goto all_free;
+    }
 
     start_time = clock();
-    newton_zero_x(&point[0]);
+    newton_zero_x(&p[0]);
 
     /* Save the first point */
-    fprintf(output, "%.12lf %.12lf\n", point[0], point[1]);
+    fprintf(output, "%.12lf %.12lf\n", p[0], p[1]);
 
     for (i = 0; i < PLOT_STEPS; i++) {
-        exit_code = tangent(point, tgt);
+        exit_code = tangent(p, tmp);
         if (exit_code != 0) {
             fprintf(stderr, "Iter #%d: Tangent got division by 0 at (%f, %f)\n",
-                    i, point[0], point[1]);
+                    i, p[0], p[1]);
             break;
         }
 
-        if (i > 0 && dot(tgt, tgt0) < 0) {
-            tgt[0] *= -1;
-            tgt[1] *= -1;
+        /* Check the last tangent vector and change the sign of the current
+         * if different, so we do not change directions while looping */
+        if (i > 0 && dot(tmp, t) < 0) {
+            tmp[0] *= -1;
+            tmp[1] *= -1;
         }
 
-        tgt0[0] = tgt[0];
-        tgt0[1] = tgt[1];
+        t[0] = tmp[0];
+        t[1] = tmp[1];
+
+        /* Compute the x_1 within a distance H_STEP from x_0 */
+        tmp[0] = p[0] + H_STEP * tmp[0];
+        tmp[1] = p[1] + H_STEP * tmp[1];
 
         /* Newton method iteration to find the next point */
-        exit_code = newton_iterator(point[0], point[1], point[0] + h * tgt[0],
-                                    point[1] + h * tgt[1], h, point);
+        exit_code = newton_iterator(p[0], p[1], tmp[0], tmp[1], p);
 
         if (exit_code != 0) {
             fprintf(stderr, "Iter #%d: Newton iterator returned code %d\n", i,
@@ -254,32 +267,39 @@ int main() {
             break;
         }
 
-        if (isnan(point[0]) || isnan(point[1])) {
+        if (isnan(p[0]) || isnan(p[1])) {
             fprintf(stderr, "Iter #%d: Got NaN in current point: (%f, %f)\n", i,
-                    point[0], point[1]);
+                    p[0], p[1]);
             break;
         }
 
-        if (fabs(f(point[0], point[1])) >= TOLERANCE) {
+        if (fabs(f(p[0], p[1])) >= TOLERANCE) {
             fprintf(stderr, "Iter #%d: Tolerance exceeded (%2.16f)\n", i,
-                    fabs(f(point[0], point[1])));
+                    fabs(f(p[0], p[1])));
             break;
         }
 
         /* Save the point to a file */
-        fprintf(output, "%.12lf %.12lf\n", point[0], point[1]);
+        fprintf(output, "%.12lf %.12lf\n", p[0], p[1]);
     }
 
     end_time = clock();
     elapsed_time = ((double)end_time - (double)start_time) / CLOCKS_PER_SEC;
     fprintf(stderr, "Elapsed time: %2.4f s.\n", elapsed_time);
 
+    /* If we made it here, there were no errors */
+    exit_code = 0;
+
     /* Close output file and free memory */
     fclose(output);
 
-    free(point);
-    free(tgt);
-    free(tgt0);
+all_free:
+    free(tmp);
+t_free:
+    free(t);
+p_free:
+    free(p);
 
-    return 0;
+out:
+    return exit_code;
 }
