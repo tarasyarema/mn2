@@ -8,6 +8,7 @@
 \usepackage[colorlinks=true, allcolors=blue]{hyperref}
 \usepackage{listings}
 \usepackage{xcolor}
+\usepackage{amsfonts}
 \usepackage{xparse}
 \usepackage{url}
 \usepackage{graphicx}
@@ -89,8 +90,8 @@ DH(x, y) =
 \end{pmatrix}
 \end{equation}
 
-Suppose that we have a solution $\overline{x}$ of the system \ref{sys}, so if we do the Taylor development of $H$ in a 
-point $x_k$ sufficiently near to $\overline{x}$ we have
+Suppose that we have a solution $\overline{x} \in \mathbb{R}^2$ of the system \ref{sys}, so if we do the Taylor development of $H$ in a 
+point $x_k \in \mathbb{R}^2$ sufficiently near to $\overline{x}$ we have
 
 \begin{equation}
     \label{taylor}
@@ -101,12 +102,12 @@ Now, we know by \cite[Equation 3.1]{MN2:1} that we can get the following iterati
 
 \begin{equation}
     \label{newton}
-    x_{k+1} = x_k - DH(x_k)(x_k)^{-1} H(x_k)
+    x_{k+1} = x_k - DH(x_k)^{-1} H(x_k)
 \end{equation}
 
-So, as we already have $f$ and $g$ predefined, we can compute the product $DH(x_k)(x_k)^{-1} H(x_k)$.
-We only need to know the structure of $DH(x_k)(x_k)^{-1}$.
-Firstly, the determinant of $DH$ is 
+So, as we already have $f$ and $g$ predefined, we can compute the product $DH(x_k)^{-1} H(x_k)$.
+We only need to know the structure of $DH(x_k)^{-1}$.
+Firstly, the determinant of $DH$ for a given point $(x, y) \in \mathbb{R}^2$ is 
 
 \begin{equation}
 |DH(x, y)| = 
